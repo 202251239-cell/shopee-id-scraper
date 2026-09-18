@@ -412,20 +412,18 @@ Actor.main(async () => {
         // Capture JSON responses from Shopee's search API endpoints
         if (ct.includes('json') && (
           url.includes('search_items') ||
-          url.includes('api/v4/search') ||
-          url.includes('api/v4/item') ||
-          url.includes('search/search_items') ||
-          url.includes('shopee.co.id/api/')
+          url.includes('search_prefills') ||
+          url.includes('curated_search')
         )) {
           try {
             const json = await response.json();
             capturedResponses.push({ url, json });
             log.info(`Captured API response: ${url.slice(0, 120)}...`);
 
-            // Debug: log response structure for search_items
-            if (url.includes('search_items')) {
+            // Debug: log response structure for search responses
+            if (url.includes('search_items') || url.includes('search_prefills') || url.includes('curated_search')) {
               const keys = Object.keys(json || {});
-              log.info(`[DEBUG search_items] top keys: ${JSON.stringify(keys)}`);
+              log.info(`[DEBUG ${url.includes('search_items') ? 'search_items' : url.includes('curated_search') ? 'curated' : 'prefills'}] top keys: ${JSON.stringify(keys)}`);
               // Also dump data key if present
               if (json.data) {
                 const dKeys = Object.keys(json.data);
