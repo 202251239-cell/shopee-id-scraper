@@ -464,6 +464,38 @@ Actor.main(async () => {
 
       // Event-driven wait: poll until product-bearing response arrives
       log.info('Waiting for product data...');
+      
+      // Take a screenshot after page load for debugging
+      try {
+        const ssPath = `/tmp/shopee_page${currentPage}.png`;
+        await page.screenshot({ path: ssPath, fullPage: false });
+        log.info(`Screenshot saved: ${ssPath}`);
+        await Actor.pushData({ type: 'debug_screenshot', page: currentPage, screenshotPath: ssPath });
+      } catch (ssErr) {
+        log.warning(`Screenshot failed: ${ssErr.message}`);
+      }
+      
+      // Dump page title and URL for debugging
+      try {
+        const title = await page.title();
+        const pageUrl = page.url();
+        log.info(`Page title: "${title}" URL: ${pageUrl}`);
+        // Dump page HTML length and key elements
+        const pageInfo = await page.evaluate(() => {
+          return {
+            htmlLen: document.documentElement.outerHTML.length,
+            hasProducts: document.querySelectorAll('[data-sqe="item"], .shopee-search-item-result__item, [class*="col-xs-2"], [class*="shopee-search-item-result"]').length,
+            bodyTextLen: document.body?.innerText?.length || 0,
+            bodyTextPreview: (document.body?.innerText || '').slice(0, 500),
+            scriptCount: document.querySelectorAll('script').length,
+            hasError: document.body?.innerText?.includes('error') || document.body?.innerText?.includes('captcha') || document.body?.innerText?.includes('verify'),
+          };
+        });
+        log.info(`Page info: ${JSON.stringify(pageInfo)}`);
+      } catch (piErr) {
+        log.warning(`Page info failed: ${piErr.message}`);
+      }
+
       const deadline = Date.now() + PRODUCT_WAIT_MS;
       while (allProducts.length === 0 && Date.now() < deadline) {
         await page.waitForTimeout(1000);
