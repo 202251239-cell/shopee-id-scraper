@@ -1,10 +1,8 @@
-FROM apify/actor-node-playwright-chrome:22
+FROM apify/actor-node:22
 
-WORKDIR /usr/src/app
-
-COPY package.json ./
+COPY package*.json ./
 RUN npm install --include=dev --omit=dev
 
-COPY . ./
+COPY . .
 
-CMD ["npm", "run", "start"]
+CMD npm run start

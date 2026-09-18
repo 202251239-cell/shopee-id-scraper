@@ -1,66 +1,57 @@
 # Shopee Indonesia Product Search Scraper
 
-Scrape product search results from [Shopee Indonesia](https://shopee.co.id) — one of Southeast Asia's largest e-commerce platforms with 200M+ monthly visitors.
+Scrape product search results from **Shopee Indonesia** (`shopee.co.id`) with 41+ data fields per product.
 
-## What It Extracts
+## Features
 
-**35+ fields per product:**
+- **41+ output fields**: product ID, name, pricing (5 fields), shop info (9 fields), ratings, sales, category, and more
+- **Keyword search**: search by any keyword with sorting and filtering
+- **Price filters**: min/max price in IDR
+- **Shop filters**: official shop only, Shopee verified only
+- **Location filter**: filter by seller city
+- **Rating filter**: post-fetch minimum rating filter
+- **Multi-page**: scrape up to 50 pages (~3,000 products per keyword)
+- **Deduplication**: automatically removes duplicate products across pages
+- **Fast**: direct API calls, no browser rendering needed
 
-| Category | Fields |
-|----------|--------|
-| Context | keyword, page, position |
-| Product | productId, name, url, imageUrl, imageUrls |
-| Pricing | price, priceText, priceMin, priceMax, originalPrice, discount, discountPercent, currency |
-| Shop | shopId, shopName, shopUrl, shopCity, shopRating, responseRate, responseTime, followerCount, isOfficialShop, isShopeeVerified |
-| Ratings | rating, ratingStar, reviewCount |
-| Sales | historicalSold, sold, stock |
-| Category | categoryId, categoryName |
-| Other | itemType, likedCount, commentCount, isAd, flashSale, liked |
-| Metadata | fetchedAt |
+## Input
 
-## How It Works
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `keyword` | string | ✅ | Search keyword (e.g. "headset gaming") |
+| `cookie` | string | ✅ | Raw cookie string from your browser session |
+| `maxPages` | integer | No | Pages to scrape (1-50, default: 1) |
+| `minRating` | number | No | Minimum rating filter (0-5, default: 0) |
+| `sortBy` | select | No | Sort by: relevancy, ctro, price, sales |
+| `minPrice` | integer | No | Min price in IDR |
+| `maxPrice` | integer | No | Max price in IDR |
+| `officialShop` | boolean | No | Official shop only |
+| `shopeeVerified` | boolean | No | Shopee verified only |
+| `location` | string | No | Seller city filter |
 
-This actor uses **PlaywrightCrawler** to load the Shopee search page in a real browser, then intercepts the REST API responses from `shopee.co.id/api/v4/search/search_items` to extract product data. This approach:
+## How to Get Cookie
 
-- **Bypasses anti-bot detection** — runs inside a real Chromium browser
-- **Captures structured JSON** — no fragile DOM parsing
-- **Handles dynamic loading** — works with Shopee's SPA rendering
+1. Open [shopee.co.id](https://shopee.co.id) in your browser and log in
+2. Open Developer Tools (F12)
+3. Go to **Application** → **Cookies** → `shopee.co.id`
+4. Copy all cookies as a string: `name1=value1; name2=value2; ...`
+5. Paste into the `cookie` input field
 
-## Use Cases
+> **Note**: Cookies expire after some time. If scraping fails with 403, refresh your cookie.
 
-- **Price monitoring**: Track product prices over time for dropshipping decisions
-- **Market research**: Analyze pricing trends, discount patterns, and competitor positioning
-- **Product research**: Find trending products, high-rated items, or specific niches
-- **Competitive intelligence**: Monitor official shop offerings vs regular sellers
-- **Data enrichment**: Feed structured product data into analytics pipelines
+## Output Fields
 
-## Pricing
+Each product in the dataset includes:
 
-**Pay-per-event**: you pay only for products actually written to the dataset.
-
-| Apify plan tier | Price per product |
-|-----------------|-------------------|
-| Free | $0.001 |
-| Bronze | $0.0009 |
-| Silver | $0.0008 |
-| Gold+ | $0.0007 |
-
-A 50-product search costs ~$0.05 on the free tier. The run summary is stored in the key-value store — not billed.
-
-## Input Parameters
-
-| Parameter | Required | Default | Description |
-|-----------|----------|---------|-------------|
-| `keyword` | ✅ | — | Search keywords (e.g., "laptop gaming") |
-| `maxPages` | | 1 | Pages to scrape (1–50, each = up to 60 products) |
-| `sortBy` | | Relevancy | Sort: relevancy, ctime (newest), sales (best selling), price |
-| `sortByAsc` | | true | Sort direction (ascending for price) |
-| `minPrice` | | — | Minimum price filter (IDR) |
-| `maxPrice` | | — | Maximum price filter (IDR) |
-| `minRating` | | — | Minimum product rating (1–4) |
-| `officialShop` | | false | Official shops only |
-| `shopeeVerified` | | false | Shopee-verified sellers only |
-| `location` | | — | Filter by seller city |
+- **Context**: keyword, page, position
+- **Product**: productId, name, url
+- **Pricing**: price, priceText, priceMin, priceMax, originalPrice, discount, discountPercent, currency
+- **Media**: imageUrl, imageUrls
+- **Shop**: shopId, shopName, shopUrl, shopCity, shopRating, responseRate, responseTime, followerCount, isOfficialShop, isShopeeVerified
+- **Ratings**: rating, ratingStar, reviewCount
+- **Sales**: historicalSold, sold, stock
+- **Category**: categoryId, categoryName
+- **Other**: itemType, likedCount, commentCount, isAd, flashSale, liked, fetchedAt
 
 ## Output Example
 
@@ -70,73 +61,37 @@ A 50-product search costs ~$0.05 on the free tier. The run summary is stored in 
   "page": 1,
   "position": 1,
   "productId": 123456789,
-  "name": "Earphone Gaming Stereo Bass Headset with Mic",
-  "price": 24900,
-  "priceText": "Rp24.900",
-  "priceMin": 19900,
-  "priceMax": 34900,
-  "originalPrice": 49900,
-  "discount": 25000,
+  "name": "Headset Gaming RGB LED USB 3.5mm",
+  "price": 49000,
+  "priceText": "Rp49.000",
+  "originalPrice": 99000,
+  "discount": 50000,
   "discountPercent": 50,
   "currency": "IDR",
   "imageUrl": "https://cf.shopee.co.id/file/abc123",
-  "imageUrls": ["https://cf.shopee.co.id/file/abc123"],
-  "url": "https://shopee.co.id/product/78901/123456789",
-  "shopId": 78901,
-  "shopName": "Toko Official Brand",
-  "shopUrl": "https://shopee.co.id/shop/78901",
-  "shopCity": "Jakarta",
+  "url": "https://shopee.co.id/product/98765/123456789",
+  "shopId": 98765,
+  "shopName": "GameZone Official",
+  "shopCity": "Jakarta Barat",
   "shopRating": 4.9,
-  "responseRate": 98,
-  "responseTime": "within hours",
-  "followerCount": 15000,
   "isOfficialShop": true,
-  "isShopeeVerified": true,
   "rating": 4.8,
-  "ratingStar": 4.8,
-  "reviewCount": 256,
-  "historicalSold": 15000,
-  "sold": 320,
-  "stock": 500,
-  "categoryId": 11042,
-  "categoryName": "Headset & Earphone",
-  "itemType": 0,
-  "likedCount": 450,
-  "commentCount": 89,
-  "isAd": false,
-  "flashSale": false,
-  "liked": false,
-  "fetchedAt": "2026-09-18T05:30:00.000Z"
+  "reviewCount": 150,
+  "sold": "500+",
+  "stock": 100
 }
 ```
 
-## Rate Limits & Best Practices
+## Pricing
 
-- Max 60 products per page, max 50 pages per run (3000 products)
-- Built-in 2-4 second random delay between pages to avoid rate limiting
-- Automatic retry on navigation failures
-- If Shopee blocks the request, the actor will wait and retry automatically
-- Products are deduped across pages automatically
+Pay-per-item: $0.001 per product scraped.
 
-## Local Development
+## Limitations
 
-```bash
-npm install
-npm run start
-```
+- **Cookie required**: Shopee's anti-bot blocks server-side requests. A valid browser cookie is required.
+- **Cookie expiry**: Cookies expire periodically. Refresh when you get 403 errors.
+- **Rate limiting**: Scraping too fast may trigger rate limits. The actor includes random delays between pages.
 
-## Building & Deploying
+## Legal
 
-```bash
-# Build the Docker image
-apify create
-
-# Or deploy directly
-apify push
-```
-
-## About
-
-Built by [RGamer-Z](https://github.com/202251239-cell). Part of the [Apify Store](https://apify.com/store).
-
-For issues or feature requests, open a GitHub issue or contact via Apify.
+This actor only extracts publicly available listing data from Shopee. Use responsibly and comply with Shopee's terms of service and applicable laws.

@@ -1,12 +1,14 @@
 /**
- * Shopee Indonesia Product Search Scraper v3
+ * Shopee Indonesia Product Search Scraper
  *
- * Strategy: Launch browser → extract cookies → make API calls from Node.js (not browser context).
- * Shopee detects fetch() inside headless browser, but external HTTP calls with valid cookies work.
+ * Requires user-provided cookies from browser (standard for Shopee scrapers).
+ * Shopee's anti-bot blocks server IPs; cookies from a real session bypass this.
+ *
+ * Usage: Provide keyword + cookie string from your browser.
+ * How to get cookie: Open shopee.co.id → DevTools → Application → Cookies → copy all as string.
  */
 
 import { Actor } from 'apify';
-import { PlaywrightCrawler } from 'crawlee';
 import { log } from 'crawlee';
 
 /* ──────────────────────────────────────────────
@@ -41,14 +43,10 @@ function normalizeProduct(item, ctx = {}) {
   let originalPrice = toIDR(ib.price_before_discount || item.price_before_discount);
   let discount = null;
   let discountPercent = 0;
-  if (ib.discount || item.discount) {
-    discountPercent = parseInt(ib.discount || item.discount, 10) || 0;
-  }
+  if (ib.discount || item.discount) discountPercent = parseInt(ib.discount || item.discount, 10) || 0;
   if (originalPrice && price && originalPrice > price) {
     discount = originalPrice - price;
-    if (!discountPercent && originalPrice > 0) {
-      discountPercent = Math.round((discount / originalPrice) * 100);
-    }
+    if (!discountPercent && originalPrice > 0) discountPercent = Math.round((discount / originalPrice) * 100);
   }
   if (!originalPrice && discount && price) originalPrice = price + discount;
   const image = ib.image || item.image || null;
@@ -90,19 +88,18 @@ function normalizeProduct(item, ctx = {}) {
     shopId, shopName, shopUrl, shopCity, shopRating, responseRate, responseTime,
     followerCount, isOfficialShop, isShopeeVerified,
     rating: ratingStar, ratingStar, reviewCount,
-    historicalSold, sold, stock,
-    categoryId, categoryName,
+    historicalSold, sold, stock, categoryId, categoryName,
     itemType, likedCount, commentCount, isAd, flashSale, liked,
     fetchedAt: new Date().toISOString(),
   };
 }
 
 /**
- * Call Shopee search API from Node.js using cookies extracted from browser.
- * This avoids headless browser detection since the request comes from Node.js.
+ * Call Shopee search API with user-provided cookies.
+ * The cookies come from a real browser session, bypassing anti-bot.
  */
-async function callShopeeApi(keyword, page_num, cookies, options = {}) {
-  const offset = (page_num - 1) * 60;
+async function callShopeeApi(keyword, pageNum, cookieString, options = {}) {
+  const offset = (pageNum - 1) * 60;
   const params = new URLSearchParams();
   params.set('by', options.sortBy || 'relevancy');
   params.set('limit', '60');
@@ -120,55 +117,57 @@ async function callShopeeApi(keyword, page_num, cookies, options = {}) {
 
   const url = `https://shopee.co.id/api/v4/search/search_items?${params.toString()}`;
 
-  // Convert cookie array to string
-  const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-
   const headers = {
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
     'Accept': 'application/json',
     'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
     'Referer': `https://shopee.co.id/search?keyword=${encodeURIComponent(keyword)}`,
-    'Cookie': cookieStr,
-    'X-Requested-With': 'XMLHttpRequest',
+    'X-Shopee-Language': 'id',
+    'X-API-SOURCE': 'pc',
+    'sec-ch-ua': '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin',
+    'Cookie': cookieString,
   };
 
-  log.info(`Calling API: ${url.slice(0, 120)}...`);
+  log.info(`API call: page ${pageNum}, newest=${offset}`);
 
   const resp = await fetch(url, { headers });
-  const contentType = resp.headers.get('content-type') || '';
-  log.info(`API response status=${resp.status} content-type=${contentType}`);
+  log.info(`API status=${resp.status}`);
+
+  if (resp.status === 403) {
+    log.error('API returned 403 — cookie may be expired. Please refresh your Shopee cookie.');
+    return { items: [], error: 'COOKIE_EXPIRED' };
+  }
 
   if (!resp.ok) {
-    log.warning(`API returned status ${resp.status}`);
-    return [];
+    log.warning(`API returned ${resp.status}`);
+    return { items: [], error: `HTTP_${resp.status}` };
   }
 
   const json = await resp.json();
-  const keys = Object.keys(json || {});
-  log.info(`API response keys: ${JSON.stringify(keys)}`);
 
-  // Check for anti-bot error
+  // Anti-bot error
   if (json.error !== undefined && json.error !== 0) {
-    log.warning(`API error: ${json.error}`);
-    // Dump first few numeric keys for debugging
-    for (const k of keys.slice(0, 5)) {
-      log.info(`  key="${k}" value=${JSON.stringify(json[k])?.slice(0, 100)}`);
-    }
-    return [];
+    log.warning(`API error code: ${json.error}`);
+    return { items: [], error: `API_${json.error}` };
   }
 
-  // Standard response: { items: [...], total_count: N }
+  // Standard response
   if (json.items && Array.isArray(json.items)) {
-    return json.items;
+    return { items: json.items, total: json.total_count || json.items.length };
   }
 
-  // Alternate: { data: { items: [...] } }
+  // Alt: data.items
   if (json.data?.items && Array.isArray(json.data.items)) {
-    return json.data.items;
+    return { items: json.data.items, total: json.total_count || json.data.items.length };
   }
 
-  log.info(`Unexpected response shape, keys: ${JSON.stringify(keys)}`);
-  return [];
+  log.info(`Unexpected shape: ${JSON.stringify(Object.keys(json)).slice(0, 200)}`);
+  return { items: [], error: 'UNKNOWN_SHAPE' };
 }
 
 /* ──────────────────────────────────────────────
@@ -180,6 +179,7 @@ await Actor.init();
 const input = await Actor.getInput();
 const {
   keyword,
+  cookie,
   maxPages = 1,
   minRating = 0,
   sortBy = 'relevancy',
@@ -192,144 +192,54 @@ const {
 } = input;
 
 if (!keyword) throw new Error('Input "keyword" is required');
+if (!cookie) throw new Error('Input "cookie" is required. Get it from your browser: shopee.co.id → DevTools → Application → Cookies → copy as string');
 
-log.info(`Starting Shopee scrape: "${keyword}" (${maxPages} pages, minRating=${minRating})`);
+log.info(`Shopee scrape: "${keyword}" (${maxPages} pages, minRating=${minRating})`);
 
 const allProducts = [];
 const seenIds = new Set();
+let cookieExpired = false;
 
-// Step 1: Use browser to get cookies
-let browserCookies = [];
+for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+  if (cookieExpired) {
+    log.warning(`Skipping page ${pageNum} — cookie expired`);
+    break;
+  }
 
-const crawler = new PlaywrightCrawler({
-  maxConcurrency: 1,
-  headless: true,
-  navigationTimeoutSecs: 45,
-  launchContext: {
-    launchOptions: {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-blink-features=AutomationControlled',
-      ],
-    },
-  },
-  preNavigationHooks: [
-    async ({ page }) => {
-      await page.addInitScript(() => {
-        Object.defineProperty(navigator, 'webdriver', { get: () => false });
-        window.chrome = { runtime: {} };
-        Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-        Object.defineProperty(navigator, 'languages', { get: () => ['id-ID', 'id', 'en-US', 'en'] });
-      });
-    },
-  ],
-  async requestHandler({ page, request }) {
-    const currentPage = request.userData.page || 1;
-    log.info(`Processing page ${currentPage}...`);
+  const result = await callShopeeApi(keyword, pageNum, cookie, {
+    sortBy, sortByAsc, minPrice, maxPrice, officialShop, shopeeVerified, location,
+  });
 
-    // Navigate to Shopee homepage first to establish session
-    if (currentPage === 1) {
-      log.info('Navigating to Shopee homepage to establish session...');
-      try {
-        await page.goto('https://shopee.co.id/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForTimeout(2000);
-      } catch (err) {
-        log.warning(`Homepage navigation: ${err.message}`);
-      }
+  if (result.error === 'COOKIE_EXPIRED') {
+    cookieExpired = true;
+    break;
+  }
+
+  if (result.items.length === 0) {
+    log.info(`Page ${pageNum}: 0 items — stopping pagination`);
+    break;
+  }
+
+  log.info(`Page ${pageNum}: ${result.items.length} items (total=${result.total})`);
+
+  for (const item of result.items) {
+    const product = normalizeProduct(item, { keyword, page: pageNum });
+    if (product && !seenIds.has(product.productId)) {
+      seenIds.add(product.productId);
+      product.position = allProducts.length + 1;
+      allProducts.push(product);
     }
+  }
 
-    // Navigate to search page
-    const webUrl = `https://shopee.co.id/search?keyword=${encodeURIComponent(keyword)}&page=${currentPage}`;
-    log.info(`Navigating to: ${webUrl}`);
-
-    try {
-      await page.goto(webUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    } catch (err) {
-      log.warning(`Search page navigation: ${err.message}`);
-    }
-
-    // Wait for page to load and cookies to be set
-    await page.waitForTimeout(5000);
-
-    // Extract all cookies
-    browserCookies = await page.context().cookies();
-    log.info(`Got ${browserCookies.length} cookies`);
-
-    // Now make API call from Node.js context using these cookies
-    const apiOptions = { sortBy, sortByAsc, minPrice, maxPrice, officialShop, shopeeVerified, location };
-    const apiItems = await callShopeeApi(keyword, currentPage, browserCookies, apiOptions);
-
-    if (apiItems.length > 0) {
-      log.info(`Got ${apiItems.length} items from API`);
-      for (const item of apiItems) {
-        const product = normalizeProduct(item, { keyword, page: currentPage });
-        if (product && !seenIds.has(product.productId)) {
-          seenIds.add(product.productId);
-          product.position = allProducts.length + 1;
-          allProducts.push(product);
-        }
-      }
-    } else {
-      log.info('API returned 0 items, trying DOM extraction...');
-      // Fallback: wait longer and try DOM
-      await page.waitForTimeout(5000);
-      try {
-        const domProducts = await page.evaluate(() => {
-          const results = [];
-          const cards = document.querySelectorAll('.shopee-search-item-result__item, [data-sqe="item"], .col-xs-2-4');
-          for (const card of cards) {
-            const link = card.querySelector('a[href*="/product/"]') || card.querySelector('a');
-            if (!link) continue;
-            const href = link.getAttribute('href') || '';
-            const match = href.match(/\/product\/(\d+)\/(\d+)/);
-            if (!match) continue;
-            const shopId = parseInt(match[1]);
-            const productId = parseInt(match[2]);
-            const name = (card.querySelector('.name, .line-clamp-2') || link).textContent?.trim() || '';
-            if (!name) continue;
-            const priceText = (card.querySelector('.price') || {}).textContent || '';
-            const priceMatch = priceText.replace(/[^0-9]/g, '');
-            results.push({
-              itemid: productId, shopid: shopId, name,
-              price: priceMatch ? parseInt(priceMatch) : 0,
-              image: card.querySelector('img')?.src || '',
-            });
-          }
-          return results;
-        });
-
-        log.info(`DOM found ${domProducts.length} products`);
-        for (const item of domProducts) {
-          const product = normalizeProduct(item, { keyword, page: currentPage });
-          if (product && !seenIds.has(product.productId)) {
-            seenIds.add(product.productId);
-            product.position = allProducts.length + 1;
-            allProducts.push(product);
-          }
-        }
-      } catch (domErr) {
-        log.warning(`DOM extraction failed: ${domErr.message}`);
-      }
-    }
-
-    log.info(`Page ${currentPage}: total ${allProducts.length} products`);
-  },
-  failedRequestHandler({ request }, error) {
-    log.error(`Request failed: ${request.url} - ${error.message}`);
-  },
-});
-
-// Build requests
-const requests = [];
-for (let page = 1; page <= maxPages; page++) {
-  requests.push({ url: `https://shopee.co.id/search?keyword=${encodeURIComponent(keyword)}&page=${page}`, userData: { page } });
+  // Delay between pages
+  if (pageNum < maxPages) {
+    const delay = 1000 + Math.random() * 2000;
+    log.info(`Waiting ${Math.round(delay)}ms before next page...`);
+    await new Promise(r => setTimeout(r, delay));
+  }
 }
-await crawler.addRequests(requests);
-await crawler.run();
 
-// Apply post-fetch filters
+// Post-fetch filters
 let filteredProducts = allProducts;
 if (minRating > 0) {
   const before = filteredProducts.length;
