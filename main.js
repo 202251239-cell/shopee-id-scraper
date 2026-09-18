@@ -423,19 +423,36 @@ Actor.main(async () => {
             // Debug: log response structure for search responses
             if (url.includes('search_items') || url.includes('search_prefills') || url.includes('curated_search')) {
               const keys = Object.keys(json || {});
-              log.info(`[DEBUG ${url.includes('search_items') ? 'search_items' : url.includes('curated_search') ? 'curated' : 'prefills'}] top keys: ${JSON.stringify(keys)}`);
-              // Also dump data key if present
+              const tag = url.includes('search_items') ? 'search_items' : url.includes('curated_search') ? 'curated' : 'prefills';
+              log.info(`[DEBUG ${tag}] top keys: ${JSON.stringify(keys)}`);
+              // Dump data structure
               if (json.data) {
                 const dKeys = Object.keys(json.data);
-                log.info(`[DEBUG search_items] data keys: ${JSON.stringify(dKeys)}`);
-                if (json.data.items) {
-                  const iType = Array.isArray(json.data.items) ? 'array' : typeof json.data.items;
-                  const iLen = Array.isArray(json.data.items) ? json.data.items.length : Object.keys(json.data.items).length;
-                  log.info(`[DEBUG search_items] data.items type=${iType} len=${iLen}`);
-                  if (iType === 'array' && iLen > 0) {
-                    log.info(`[DEBUG search_items] data.items[0] keys: ${JSON.stringify(Object.keys(json.data.items[0]))}`);
-                  } else if (!Array.isArray(json.data.items)) {
-                    log.info(`[DEBUG search_items] data.items subkeys: ${JSON.stringify(Object.keys(json.data.items))}`);
+                log.info(`[DEBUG ${tag}] data keys: ${JSON.stringify(dKeys)}`);
+                // Check data.modules for products
+                if (json.data.modules && typeof json.data.modules === 'object') {
+                  const modKeys = Object.keys(json.data.modules);
+                  log.info(`[DEBUG ${tag}] data.modules keys: ${JSON.stringify(modKeys)}`);
+                  for (const mk of modKeys.slice(0, 3)) {
+                    const mod = json.data.modules[mk];
+                    if (mod && typeof mod === 'object') {
+                      const mKeys = Object.keys(mod);
+                      log.info(`[DEBUG ${tag}] modules[${mk}] keys: ${JSON.stringify(mKeys)}`);
+                      if (mod.data && Array.isArray(mod.data) && mod.data.length > 0) {
+                        log.info(`[DEBUG ${tag}] modules[${mk}].data len=${mod.data.length} first keys: ${JSON.stringify(Object.keys(mod.data[0]))}`);
+                      }
+                    }
+                  }
+                }
+                // Check data.data for products
+                if (json.data.data && typeof json.data.data === 'object') {
+                  const ddKeys = Object.keys(json.data.data);
+                  log.info(`[DEBUG ${tag}] data.data keys: ${JSON.stringify(ddKeys)}`);
+                  if (json.data.data.items && Array.isArray(json.data.data.items)) {
+                    log.info(`[DEBUG ${tag}] data.data.items len=${json.data.data.items.length}`);
+                    if (json.data.data.items.length > 0) {
+                      log.info(`[DEBUG ${tag}] data.data.items[0] keys: ${JSON.stringify(Object.keys(json.data.data.items[0]))}`);
+                    }
                   }
                 }
               }
