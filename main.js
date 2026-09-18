@@ -371,6 +371,23 @@ Actor.main(async () => {
             capturedResponses.push({ url, json });
             log.info(`Captured API response: ${url.slice(0, 120)}...`);
 
+            // Debug: log response structure for search_items
+            if (url.includes('search_items')) {
+              const keys = Object.keys(json || {});
+              log.info(`[DEBUG search_items] top keys: ${JSON.stringify(keys)}`);
+              if (json.items) {
+                const isArray = Array.isArray(json.items);
+                log.info(`[DEBUG search_items] items isArray=${isArray} len=${isArray ? json.items.length : 'N/A'}`);
+                if (isArray && json.items.length > 0) {
+                  log.info(`[DEBUG search_items] first item keys: ${JSON.stringify(Object.keys(json.items[0]))}`);
+                } else if (!isArray) {
+                  log.info(`[DEBUG search_items] items is object, subkeys: ${JSON.stringify(Object.keys(json.items))}`);
+                }
+              } else {
+                log.info(`[DEBUG search_items] no items key found`);
+              }
+            }
+
             // Stream-extract: stop waiting as soon as products arrive
             if (allProducts.length === 0) {
               const extractCtx = { keyword: input.keyword, page: currentPage };
