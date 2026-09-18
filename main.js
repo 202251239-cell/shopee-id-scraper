@@ -425,35 +425,11 @@ Actor.main(async () => {
               const keys = Object.keys(json || {});
               const tag = url.includes('search_items') ? 'search_items' : url.includes('curated_search') ? 'curated' : 'prefills';
               log.info(`[DEBUG ${tag}] top keys: ${JSON.stringify(keys)}`);
-              // Dump data structure
-              if (json.data) {
-                const dKeys = Object.keys(json.data);
-                log.info(`[DEBUG ${tag}] data keys: ${JSON.stringify(dKeys)}`);
-                // Check data.modules for products
-                if (json.data.modules && typeof json.data.modules === 'object') {
-                  const modKeys = Object.keys(json.data.modules);
-                  log.info(`[DEBUG ${tag}] data.modules keys: ${JSON.stringify(modKeys)}`);
-                  for (const mk of modKeys.slice(0, 3)) {
-                    const mod = json.data.modules[mk];
-                    if (mod && typeof mod === 'object') {
-                      const mKeys = Object.keys(mod);
-                      log.info(`[DEBUG ${tag}] modules[${mk}] keys: ${JSON.stringify(mKeys)}`);
-                      if (mod.data && Array.isArray(mod.data) && mod.data.length > 0) {
-                        log.info(`[DEBUG ${tag}] modules[${mk}].data len=${mod.data.length} first keys: ${JSON.stringify(Object.keys(mod.data[0]))}`);
-                      }
-                    }
-                  }
-                }
-                // Check data.data for products
-                if (json.data.data && typeof json.data.data === 'object') {
-                  const ddKeys = Object.keys(json.data.data);
-                  log.info(`[DEBUG ${tag}] data.data keys: ${JSON.stringify(ddKeys)}`);
-                  if (json.data.data.items && Array.isArray(json.data.data.items)) {
-                    log.info(`[DEBUG ${tag}] data.data.items len=${json.data.data.items.length}`);
-                    if (json.data.data.items.length > 0) {
-                      log.info(`[DEBUG ${tag}] data.data.items[0] keys: ${JSON.stringify(Object.keys(json.data.data.items[0]))}`);
-                    }
-                  }
+              // For search_items: dump actual values of numeric keys
+              if (tag === 'search_items') {
+                for (const k of keys.slice(0, 5)) {
+                  const v = json[k];
+                  log.info(`[DEBUG search_items] key="${k}" value=${JSON.stringify(v)?.slice(0, 150)}`);
                 }
               }
             }
@@ -512,7 +488,40 @@ Actor.main(async () => {
       if (allProducts.length === 0) {
         log.info('No API products found, trying DOM extraction...');
         try {
+          // Try __NEXT_DATA__ first
           allProducts = await page.evaluate((ctx) => {
+            const results = [];
+            // Try __NEXT_DATA__
+            const nextDataEl = document.querySelector('#__NEXT_DATA__');
+            if (nextDataEl) {
+              try {
+                const nd = JSON.parse(nextDataEl.textContent);
+                // Navigate to find products
+                const props = nd?.props?.pageProps;
+                if (props) {
+                  const keys = Object.keys(props);
+                  // Look for arrays of items
+                  for (const k of keys) {
+                    const v = props[k];
+                    if (Array.isArray(v) && v.length > 0 && v[0]?.itemid) {
+                      for (let i = 0; i < v.length; i++) {
+                        results.push(v[i]);
+                      }
+                    }
+                  }
+                }
+              } catch {}
+            }
+            return results;
+          }, { page: currentPage, keyword: input.keyword });
+
+          if (allProducts.length > 0) {
+            log.info(`DOM __NEXT_DATA__: found ${allProducts.length} products`);
+          }
+
+          // If still nothing, try generic DOM
+          if (allProducts.length === 0) {
+            allProducts = await page.evaluate((ctx) => {
             const results = [];
             // Shopee product cards typically use data-sqe or class patterns
             const cards = document.querySelectorAll(
@@ -546,6 +555,7 @@ Actor.main(async () => {
           }, { page: currentPage, keyword: input.keyword });
 
           log.info(`DOM fallback: found ${allProducts.length} products`);
+          } // end generic DOM
         } catch (domErr) {
           log.warning(`DOM extraction failed: ${domErr.message}`);
         }
