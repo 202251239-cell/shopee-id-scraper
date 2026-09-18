@@ -87,15 +87,5 @@
       "description": "Filter by seller city (e.g. 'Jakarta', 'Surabaya'). Leave empty for all.",
       "editor": "textfield"
     }
-  },
-  "groups": [
-    {
-      "title": "Search",
-      "fields": ["keyword", "maxPages", "sortBy", "sortByAsc", "minPrice", "maxPrice", "officialShop", "shopeeVerified", "location", "minRating"]
-    },
-    {
-      "title": "Authentication",
-      "fields": ["cookie"]
-    }
-  ]
+  }
 }
