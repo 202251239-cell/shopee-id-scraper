@@ -15,8 +15,7 @@
       "title": "Shopee Cookie",
       "type": "string",
       "description": "Raw cookie string from your browser. How to get: Open shopee.co.id → log in → F12 → Application → Cookies → copy all cookies as 'name=value; name2=value2' format",
-      "editor": "textfield",
-      "sensitive": true
+      "editor": "textfield"
     },
     "maxPages": {
       "title": "Max Pages",
