@@ -299,6 +299,36 @@ function extractProductsFromApiResponse(json, ctx = {}) {
     }
   }
 
+  // Shape 4: { data: { items: { product: [...] } } } (Shopee v4 nested)
+  if (json.data?.items && typeof json.data.items === 'object' && !Array.isArray(json.data.items)) {
+    if (Array.isArray(json.data.items.product)) {
+      for (const item of json.data.items.product) {
+        positionCounter++;
+        const product = normalizeProduct(item, { ...ctx, position: positionCounter });
+        if (product) products.push(product);
+      }
+      if (products.length > 0) {
+        log.info(`Matched data.items.product shape: ${products.length} products`);
+        return { products, source: 'data_items_product' };
+      }
+    }
+  }
+
+  // Shape 5: { data: [...] } — data is directly an array
+  if (Array.isArray(json.data) && json.data.length > 0) {
+    for (const item of json.data) {
+      if (item && typeof item === 'object') {
+        positionCounter++;
+        const product = normalizeProduct(item, { ...ctx, position: positionCounter });
+        if (product) products.push(product);
+      }
+    }
+    if (products.length > 0) {
+      log.info(`Matched data array shape: ${products.length} products`);
+      return { products, source: 'data_array' };
+    }
+  }
+
   // Shape 4: { recommend: { product: [...] } } or other nested shapes
   for (const key of ['recommend', 'data', 'result']) {
     const container = json[key];
@@ -383,16 +413,19 @@ Actor.main(async () => {
             if (url.includes('search_items')) {
               const keys = Object.keys(json || {});
               log.info(`[DEBUG search_items] top keys: ${JSON.stringify(keys)}`);
-              // Dump first few keys' values
-              for (const k of keys.slice(0, 3)) {
-                const v = json[k];
-                const vType = Array.isArray(v) ? 'array' : typeof v;
-                const vLen = Array.isArray(v) ? v.length : (v && typeof v === 'object' ? Object.keys(v).length : 'N/A');
-                log.info(`[DEBUG search_items] key="${k}" type=${vType} len=${vLen}`);
-                if (vType === 'array' && vLen > 0) {
-                  log.info(`[DEBUG search_items] key="${k}" first item keys: ${JSON.stringify(Object.keys(v[0]))}`);
-                } else if (vType === 'object' && v && !Array.isArray(v)) {
-                  log.info(`[DEBUG search_items] key="${k}" subkeys: ${JSON.stringify(Object.keys(v))}`);
+              // Also dump data key if present
+              if (json.data) {
+                const dKeys = Object.keys(json.data);
+                log.info(`[DEBUG search_items] data keys: ${JSON.stringify(dKeys)}`);
+                if (json.data.items) {
+                  const iType = Array.isArray(json.data.items) ? 'array' : typeof json.data.items;
+                  const iLen = Array.isArray(json.data.items) ? json.data.items.length : Object.keys(json.data.items).length;
+                  log.info(`[DEBUG search_items] data.items type=${iType} len=${iLen}`);
+                  if (iType === 'array' && iLen > 0) {
+                    log.info(`[DEBUG search_items] data.items[0] keys: ${JSON.stringify(Object.keys(json.data.items[0]))}`);
+                  } else if (!Array.isArray(json.data.items)) {
+                    log.info(`[DEBUG search_items] data.items subkeys: ${JSON.stringify(Object.keys(json.data.items))}`);
+                  }
                 }
               }
             }
