@@ -238,17 +238,6 @@ function extractProductsFromApiResponse(json, ctx = {}) {
   // Debug: log top-level keys and items structure
   const topKeys = Object.keys(json);
   log.info(`Response keys: ${JSON.stringify(topKeys)}`);
-  if (json.items) {
-    const itemsType = Array.isArray(json.items) ? 'array' : typeof json.items;
-    const itemsLen = Array.isArray(json.items) ? json.items.length : Object.keys(json.items).length;
-    log.info(`items type=${itemsType} len=${itemsLen}`);
-    if (itemsLen > 0 && itemsType === 'object' && !Array.isArray(json.items)) {
-      log.info(`items subkeys: ${JSON.stringify(Object.keys(json.items))}`);
-    }
-    if (Array.isArray(json.items) && json.items.length > 0) {
-      log.info(`First item keys: ${JSON.stringify(Object.keys(json.items[0]))}`);
-    }
-  }
 
   // Shape 1: Standard Shopee search response { items: [...], total_count: N }
   if (Array.isArray(json.items) && json.items.length > 0) {
@@ -260,6 +249,25 @@ function extractProductsFromApiResponse(json, ctx = {}) {
     if (products.length > 0) {
       log.info(`Matched standard items array: ${products.length} products (total_count=${json.total_count || 'N/A'})`);
       return { products, source: 'items_array', totalCount: json.total_count };
+    }
+  }
+
+  // Shape 2: Shopee v4 with numeric keys — response is { "0": item, "1": item, ..., "error": ... }
+  // Items are directly at numeric keys, not wrapped in an "items" array
+  const numericKeys = topKeys.filter(k => /^\d+$/.test(k));
+  if (numericKeys.length > 0) {
+    log.info(`Found ${numericKeys.length} numeric keys (possible items)`);
+    for (const k of numericKeys) {
+      const item = json[k];
+      if (item && typeof item === 'object') {
+        positionCounter++;
+        const product = normalizeProduct(item, { ...ctx, position: positionCounter });
+        if (product) products.push(product);
+      }
+    }
+    if (products.length > 0) {
+      log.info(`Matched numeric-key shape: ${products.length} products`);
+      return { products, source: 'numeric_keys' };
     }
   }
 
@@ -375,16 +383,17 @@ Actor.main(async () => {
             if (url.includes('search_items')) {
               const keys = Object.keys(json || {});
               log.info(`[DEBUG search_items] top keys: ${JSON.stringify(keys)}`);
-              if (json.items) {
-                const isArray = Array.isArray(json.items);
-                log.info(`[DEBUG search_items] items isArray=${isArray} len=${isArray ? json.items.length : 'N/A'}`);
-                if (isArray && json.items.length > 0) {
-                  log.info(`[DEBUG search_items] first item keys: ${JSON.stringify(Object.keys(json.items[0]))}`);
-                } else if (!isArray) {
-                  log.info(`[DEBUG search_items] items is object, subkeys: ${JSON.stringify(Object.keys(json.items))}`);
+              // Dump first few keys' values
+              for (const k of keys.slice(0, 3)) {
+                const v = json[k];
+                const vType = Array.isArray(v) ? 'array' : typeof v;
+                const vLen = Array.isArray(v) ? v.length : (v && typeof v === 'object' ? Object.keys(v).length : 'N/A');
+                log.info(`[DEBUG search_items] key="${k}" type=${vType} len=${vLen}`);
+                if (vType === 'array' && vLen > 0) {
+                  log.info(`[DEBUG search_items] key="${k}" first item keys: ${JSON.stringify(Object.keys(v[0]))}`);
+                } else if (vType === 'object' && v && !Array.isArray(v)) {
+                  log.info(`[DEBUG search_items] key="${k}" subkeys: ${JSON.stringify(Object.keys(v))}`);
                 }
-              } else {
-                log.info(`[DEBUG search_items] no items key found`);
               }
             }
 
