@@ -235,6 +235,21 @@ function extractProductsFromApiResponse(json, ctx = {}) {
   const products = [];
   let positionCounter = 0;
 
+  // Debug: log top-level keys and items structure
+  const topKeys = Object.keys(json);
+  log.info(`Response keys: ${JSON.stringify(topKeys)}`);
+  if (json.items) {
+    const itemsType = Array.isArray(json.items) ? 'array' : typeof json.items;
+    const itemsLen = Array.isArray(json.items) ? json.items.length : Object.keys(json.items).length;
+    log.info(`items type=${itemsType} len=${itemsLen}`);
+    if (itemsLen > 0 && itemsType === 'object' && !Array.isArray(json.items)) {
+      log.info(`items subkeys: ${JSON.stringify(Object.keys(json.items))}`);
+    }
+    if (Array.isArray(json.items) && json.items.length > 0) {
+      log.info(`First item keys: ${JSON.stringify(Object.keys(json.items[0]))}`);
+    }
+  }
+
   // Shape 1: Standard Shopee search response { items: [...], total_count: N }
   if (Array.isArray(json.items) && json.items.length > 0) {
     for (const item of json.items) {
