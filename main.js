@@ -151,8 +151,8 @@ const seenIds = new Set();
 
 const crawler = new PlaywrightCrawler({
   maxConcurrency: 1,
-  requestTimeoutSecs: 90,
   headless: true,
+  navigationTimeoutSecs: 45,
   launchContext: {
     launchOptions: {
       headless: true,
