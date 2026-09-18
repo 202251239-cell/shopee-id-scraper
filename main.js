@@ -316,6 +316,19 @@ function extractProductsFromApiResponse(json, ctx = {}) {
 
   // Shape 5: { data: [...] } — data is directly an array
   if (Array.isArray(json.data) && json.data.length > 0) {
+    // Debug: dump first item structure
+    if (json.data[0]) {
+      const firstItem = json.data[0];
+      log.info(`[DEBUG data_array] first item type=${typeof firstItem} keys=${JSON.stringify(Object.keys(firstItem))}`);
+      if (firstItem.item_basic) {
+        log.info(`[DEBUG data_array] item_basic keys: ${JSON.stringify(Object.keys(firstItem.item_basic))}`);
+      }
+      // Dump a few field values for debugging
+      for (const k of ['itemid', 'name', 'price', 'image', 'shopid', 'shop_name'].slice(0, 4)) {
+        const v = firstItem[k] || firstItem.item_basic?.[k];
+        log.info(`[DEBUG data_array] field "${k}" = ${JSON.stringify(v)?.slice(0, 80)}`);
+      }
+    }
     for (const item of json.data) {
       if (item && typeof item === 'object') {
         positionCounter++;
