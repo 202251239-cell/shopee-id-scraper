@@ -1,0 +1,110 @@
+{
+  "title": "Shopee Indonesia Product Search Scraper",
+  "description": "Scrape product search results from Shopee Indonesia (shopee.co.id). Extracts product name, price, discount, shop info, ratings, reviews, and more.",
+  "type": "object",
+  "schemaVersion": 1,
+  "required": ["keyword"],
+  "properties": {
+    "keyword": {
+      "title": "Search Keywords",
+      "description": "Keywords to search for on Shopee Indonesia (e.g., 'laptop gaming', 'sepatu nike')",
+      "type": "string",
+      "editor": "textfield",
+      "prefill": "laptop gaming"
+    },
+    "maxPages": {
+      "title": "Max Pages",
+      "description": "Number of pages to scrape. Each page yields up to ~60 products. Max 50 pages (3000 products).",
+      "type": "integer",
+      "editor": "number",
+      "minimum": 1,
+      "maximum": 50,
+      "default": 1,
+      "prefill": 1
+    },
+    "sortBy": {
+      "title": "Sort By",
+      "description": "Sort results by a specific field.",
+      "type": "string",
+      "editor": "select",
+      "default": "relevancy",
+      "enumSuggestedValues": [
+        "relevancy",
+        "ctime",
+        "sales",
+        "price"
+      ],
+      "enumTitles": [
+        "Relevance (default)",
+        "Newest",
+        "Best Selling",
+        "Price (Low to High)"
+      ]
+    },
+    "sortByAsc": {
+      "title": "Sort Ascending",
+      "description": "Sort direction. True for ascending (low to high for price), false for descending (high to low). Only affects price sort.",
+      "type": "boolean",
+      "editor": "checkbox",
+      "default": true
+    },
+    "minPrice": {
+      "title": "Minimum Price (IDR)",
+      "description": "Filter products with price above this value. Leave 0 for no filter.",
+      "type": "integer",
+      "editor": "number",
+      "minimum": 0,
+      "default": 0
+    },
+    "maxPrice": {
+      "title": "Maximum Price (IDR)",
+      "description": "Filter products with price below this value. Leave 0 for no filter.",
+      "type": "integer",
+      "editor": "number",
+      "minimum": 0,
+      "default": 0
+    },
+    "minRating": {
+      "title": "Minimum Rating",
+      "description": "Only return products with this rating or higher. 0 = any rating.",
+      "type": "string",
+      "editor": "select",
+      "default": "0",
+      "enumSuggestedValues": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "enumTitles": [
+        "Any rating",
+        "1+ star",
+        "2+ stars",
+        "3+ stars",
+        "4+ stars"
+      ]
+    },
+    "officialShop": {
+      "title": "Official Shop Only",
+      "description": "Only return products from official/brand shops.",
+      "type": "boolean",
+      "editor": "checkbox",
+      "default": false
+    },
+    "shopeeVerified": {
+      "title": "Shopee Verified Only",
+      "description": "Only return products from Shopee-verified sellers.",
+      "type": "boolean",
+      "editor": "checkbox",
+      "default": false
+    },
+    "location": {
+      "title": "Location",
+      "description": "Filter by seller city (e.g., 'Jakarta', 'Surabaya'). Leave empty for all.",
+      "type": "string",
+      "editor": "textfield",
+      "default": ""
+    }
+  }
+}

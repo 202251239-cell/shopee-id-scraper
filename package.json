@@ -1,0 +1,20 @@
+{
+  "name": "shopee-id-scraper",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Scrape Shopee Indonesia product search results using headless browser",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "test": "echo \"No tests yet\""
+  },
+  "dependencies": {
+    "apify": "^3.2.0",
+    "crawlee": "^3.12.0",
+    "playwright": "^1.49.0"
+  },
+  "devDependencies": {},
+  "keywords": ["shopee", "scraper", "ecommerce", "indonesia", "price", "product", "shopee-id"],
+  "author": "RGamer-Z",
+  "license": "MIT"
+}

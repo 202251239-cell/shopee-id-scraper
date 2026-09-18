@@ -1,0 +1,14 @@
+{
+    "actorSpecification": 1,
+    "name": "shopee-id-scraper",
+    "title": "Shopee Indonesia Scraper",
+    "description": "Scrape Shopee Indonesia (shopee.co.id) product search results into clean JSON: price, discount, image URL, shop name, stock, ratings, and category. No API key needed.",
+    "version": "0.0",
+    "buildTag": "latest",
+    "defaultMemoryMbytes": 4096,
+    "output": "./output_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json",
+        "keyValueStore": "./key_value_store_schema.json"
+    }
+}
